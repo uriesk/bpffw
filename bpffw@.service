@@ -1,0 +1,16 @@
+[Unit]
+Description=BPF XDP Firewall for %i
+After=network-online.target
+Wants=network-online.target
+BindsTo=sys-subsystem-net-devices-%i.device
+After=sys-subsystem-net-devices-%i.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/bpffw/load-bpffw.sh %i
+ExecStop=/opt/bpffw/unload-bpffw.sh %i
+TimeoutSec=60
+
+[Install]
+WantedBy=multi-user.target
