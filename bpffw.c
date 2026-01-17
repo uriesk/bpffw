@@ -174,7 +174,7 @@ int xdp_firewall_filter(struct xdp_md *ctx) {
       return XDP_PASS;
     }
 
-    __u32 addr = iph->saddr;
+    __u32 addr = bpf_ntohl(iph->saddr);
     struct rate_limit_entry *rate_limiter = bpf_map_lookup_elem(&rate_limit_v4, &addr);
     if (!rate_limiter) {
       struct rate_limit_entry new_entry;

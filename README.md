@@ -88,8 +88,15 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe
 bpftool prog list
 ```
 
-♣ *Dump a rate limiting map to json*
+♣ *Dump all blocked IPs of rate limiting map to json*
 
 ```bash
-bpftool map dump name rate_limit_v6
+bpftool map dump name rate_limit_v4 -j | jq -r '.[] | select(.formatted.value.blocked != 0)'
+bpftool map dump name rate_limit_v6 -j | jq -r '.[] | select(.formatted.value.blocked != 0)'
+```
+
+♣ *List all currently blocked IPs*
+
+```bash
+./list-blocked.sh
 ```
