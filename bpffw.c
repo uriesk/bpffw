@@ -15,6 +15,15 @@
 })
 
 /*
+ * including those from icmp.h and icmpv6.h includes some 32bit stuff that we
+ * don't want
+ */
+#define ICMP_ECHOREPLY 0
+#define ICMP_ECHO 8
+#define ICMPV6_ECHO_REQUEST 128
+#define ICMPV6_ECHO_REPLY 129
+
+/*
  * rate limit structs
  */
 
@@ -85,7 +94,7 @@ static __always_inline int is_tcp_allowed(struct tcphdr *tcph, struct rate_limit
     return 1;
   }
 
-  if (tick_rate_limit(rate_limiter, 150)) {
+  if (tick_rate_limit(rate_limiter, 160)) {
     return 0;
   }
 
@@ -94,9 +103,9 @@ static __always_inline int is_tcp_allowed(struct tcphdr *tcph, struct rate_limit
   switch (dest_port) {
     case 443: // https
     case 80: // http
-    case 25:
-    case 993:
-    case 587:
+    case 25: // some
+    case 993: // email
+    case 587: // stuff
     case 50000: // ssh
     case 25565: // Minecraft
     case 3478: // STUN
@@ -111,7 +120,7 @@ static __always_inline int is_tcp_allowed(struct tcphdr *tcph, struct rate_limit
  * Check if UDP packet is allowed
  */
 static __always_inline int is_udp_allowed(struct udphdr *udph, struct rate_limit_entry *rate_limiter) {
-  if (tick_rate_limit(rate_limiter, 200)) {
+  if (tick_rate_limit(rate_limiter, 210)) {
     return 0;
   }
 
@@ -222,6 +231,26 @@ int xdp_firewall_filter(struct xdp_md *ctx) {
       }
       return XDP_DROP;
     }
+    // ICMP
+    else if (iph->protocol == IPPROTO_ICMP) {
+      // don't care about fragments
+      if (iph->frag_off & bpf_htons(0x1FFF)) {
+        return XDP_PASS;
+      }
+      // we only need the first byte to get the type
+      void *icmp_ptr = data + sizeof(*eth) + (iph->ihl * 4);
+      // bound check
+      if (icmp_ptr + 1 > data_end) {
+        return XDP_PASS;
+      }
+      __u8 icmp_type = *(__u8 *)icmp_ptr;
+
+      if (icmp_type == ICMP_ECHO || icmp_type == ICMP_ECHOREPLY) {
+        if (tick_rate_limit(rate_limiter, 30)) {
+          return XDP_DROP;
+        }
+      }
+    }
   }
   
   // IPv6 handling
@@ -267,6 +296,22 @@ int xdp_firewall_filter(struct xdp_md *ctx) {
         return XDP_PASS;
       }
       return XDP_DROP;
+    }
+    // ICMP
+    else if (ip6h->nexthdr == IPPROTO_ICMPV6) {
+      // we only need the first byte to get the type
+      void *icmp_ptr = data + sizeof(*eth) + sizeof(*ip6h);
+      // bound check
+      if (icmp_ptr + 1 > data_end) {
+        return XDP_PASS;
+      }
+      __u8 icmp_type = *(__u8 *)icmp_ptr;
+
+      if (icmp_type == ICMPV6_ECHO_REQUEST || icmp_type == ICMPV6_ECHO_REPLY) {
+        if (tick_rate_limit(rate_limiter, 30)) {
+          return XDP_DROP;
+        }
+      }
     }
     // fragments
     else if (ip6h->nexthdr == IPPROTO_FRAGMENT) {
