@@ -263,6 +263,14 @@ int xdp_firewall_filter(struct xdp_md *ctx) {
 
     __u64 addrv6 = ((__u64)bpf_ntohl(ip6h->saddr.in6_u.u6_addr32[0]) << 32) |
     bpf_ntohl(ip6h->saddr.in6_u.u6_addr32[1]);
+
+    /*
+     * whitelist
+     */
+    if (addrv6 == 0x2400cb0001511000ULL) {
+      return XDP_PASS;
+    }
+
     struct rate_limit_entry *rate_limiter = bpf_map_lookup_elem(&rate_limit_v6, &addrv6);
     if (!rate_limiter) {
       struct rate_limit_entry new_entry;
