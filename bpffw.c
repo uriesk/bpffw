@@ -151,7 +151,7 @@ static __always_inline int is_udp_allowed(struct udphdr *udph, struct rate_limit
     // DHCP responses
     || (src_port == 67 && dest_port == 68)
     // NTP responses
-    || (src_port == 123 && dest_port == 123)
+    || (src_port == 123 && dest_port >= 1024)
   ) {
     return 1;
   }
